@@ -13,7 +13,7 @@ void main() {
 
   test('check file options validation', () {
     final options = UpChunkOptions()
-      ..endPoint = ''
+      ..endPoint = ['asfdfas']
       ..endPointResolver = null
       ..onAttempt = (c, a) {
 

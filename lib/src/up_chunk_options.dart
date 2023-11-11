@@ -7,7 +7,7 @@ class UpChunkOptions {
   List<Interceptor> interceptors = [];
 
   /// Upload url as [String], required if [endPointResolver] == null
-  String? endPoint;
+  List<String>? endPoint;
 
   /// Future that returns the upload url as [String], required if [endPoint] == null
   Future<String>? endPointResolver;
