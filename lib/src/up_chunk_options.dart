@@ -6,10 +6,10 @@ import 'package:dio/dio.dart';
 class UpChunkOptions {
   List<Interceptor> interceptors = [];
 
-  /// Upload url as [List], required if [endPointResolver] == null
-  List<String>? endPoints;
+  /// Upload url as [String], required if [endPointResolver] == null
+  String? endPoint;
 
-  /// Future that returns the upload url as [String], required if [endPoints] == null
+  /// Future that returns the upload url as [String], required if [endPoint] == null
   Future<String>? endPointResolver;
 
   /// [File] to upload, required
