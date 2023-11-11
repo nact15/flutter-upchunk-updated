@@ -19,6 +19,7 @@ class UpChunk {
   File? file;
   Map<String, String> headers = {};
   int chunkSize = 0;
+  int startChunk = 0;
   int attempts = 0;
   int delayBeforeAttempt = 0;
 
@@ -45,7 +46,7 @@ class UpChunk {
   void Function(String message, int chunkNumber, int attemptsLeft)? _onAttemptFailure;
   void Function(String message, int chunk, int attempts)? _onError;
   void Function()? _onSuccess;
-  void Function(double progress )? _onProgress;
+  void Function(double progress, int chunk)? _onProgress;
 
   static UpChunk createUpload(UpChunkOptions options) => UpChunk._internal(options);
 
@@ -56,12 +57,14 @@ class UpChunk {
     file = options.file;
     headers = options.headers;
     chunkSize = options.chunkSize;
+    startChunk = options.startChunk ?? 0;
     attempts = options.attempts;
     delayBeforeAttempt = options.delayBeforeAttempt;
 
     _validateOptions();
 
     _chunkByteSize = chunkSize * 1024;
+    _chunkCount += startChunk;
     _onOnline = options.onOnline;
     _onOffline = options.onOffline;
     _onAttempt = options.onAttempt;
@@ -70,14 +73,12 @@ class UpChunk {
     _onSuccess = options.onSuccess;
     _onProgress = options.onProgress;
 
-    _getEndpoint()
-      .then((value) async {
-        _fileSize = await options.file!.length();
-        _totalChunks =  (_fileSize / _chunkByteSize).ceil();
+    _getEndpoint().then((value) async {
+      _fileSize = await options.file!.length();
+      _totalChunks = (_fileSize / _chunkByteSize).ceil();
 
-        await _getMimeType();
-      })
-      .then((_) => _sendChunks());
+      _getMimeType();
+    }).then((_) => _sendChunks());
 
     // restart sync when back online
     // trigger events when offline/back online
@@ -86,17 +87,17 @@ class UpChunk {
   }
 
   /// It pauses the upload, the [_chunk] currently being uploaded will finish first before pausing the next [_chunk]
-  pause() => _paused = true;
+  void pause() => _paused = true;
 
   /// It resumes the upload for the next [_chunk]
-  resume() {
+  void resume() {
     if (!_paused) return;
 
     _paused = false;
     _sendChunks();
   }
 
-  stop() {
+  void stop() {
     _stopped = true;
     _uploadFailed = true;
     _currentCancelToken!.cancel(Exception('Upload cancelled by the user'));
@@ -110,7 +111,7 @@ class UpChunk {
   }
 
   /// It gets [file]'s mime type, if possible
-  _getMimeType() async {
+  void _getMimeType() async {
     try {
       _fileMimeType = lookupMimeType(file!.path);
     } catch (_) {
@@ -119,21 +120,20 @@ class UpChunk {
   }
 
   /// It validates the passed options
-  _validateOptions() {
+  void _validateOptions() {
+    if (startChunk < 0) throw ArgumentError('startChunk must be greater than or equal to 0');
+
     if (endPoint == null && endPointResolver == null)
       throw new Exception('either endPoint or endPointResolver must be defined');
 
-    if (file == null)
-      throw new Exception('file can''t be null');
+    if (file == null) throw new Exception('file can' 't be null');
 
     if (chunkSize <= 0 || chunkSize % 64 != 0)
       throw new Exception('chunkSize must be a positive number in multiples of 64');
 
-    if (attempts <= 0)
-      throw new Exception('retries must be a positive number');
+    if (attempts <= 0) throw new Exception('retries must be a positive number');
 
-    if (delayBeforeAttempt < 0)
-      throw new Exception('delayBeforeAttempt must be a positive number');
+    if (delayBeforeAttempt < 0) throw new Exception('delayBeforeAttempt must be a positive number');
   }
 
   /// Gets a value for [_endpointValue]
@@ -155,10 +155,9 @@ class UpChunk {
   ///
   /// if the connection drops [_offline] is marked as true and upload us paused,
   /// if connection is restore [_offline] is marked as false and resumes the upload
-  _connectionChanged(dynamic hasConnection) {
+  void _connectionChanged(dynamic hasConnection) {
     if (hasConnection) {
-      if (!_offline)
-        return;
+      if (!_offline) return;
 
       _offline = false;
 
@@ -184,13 +183,16 @@ class UpChunk {
       'content-range': 'bytes $rangeStart-$rangeEnd/$_fileSize',
       Headers.contentLengthHeader: _chunkLength
     };
-    if (_fileMimeType != null){
+    if (_fileMimeType != null) {
       putHeaders.putIfAbsent(Headers.contentTypeHeader, () => _fileMimeType!);
     }
     headers.forEach((key, value) => putHeaders.putIfAbsent(key, () => value));
 
     if (_onAttempt != null)
-      _onAttempt!(_chunkCount, _chunkLength,);
+      _onAttempt!(
+        _chunkCount,
+        _chunkLength,
+      );
 
     _currentCancelToken = CancelToken();
 
@@ -200,9 +202,7 @@ class UpChunk {
       options: Options(
         headers: putHeaders,
         followRedirects: false,
-        validateStatus: (status) {
-          return true;
-        }
+        validateStatus: (status) => true,
       ),
       data: _chunk,
       onSendProgress: (int sent, int total) {
@@ -210,8 +210,7 @@ class UpChunk {
           final bytesSent = _chunkCount * _chunkByteSize;
           final percentProgress = (bytesSent + sent) * 100.0 / _fileSize;
 
-          if (percentProgress < 100.0)
-            _onProgress!(percentProgress);
+          if (percentProgress < 100.0) _onProgress!(percentProgress, _chunkCount);
         }
       },
       cancelToken: _currentCancelToken,
@@ -219,7 +218,7 @@ class UpChunk {
   }
 
   /// Gets [_chunk] and [_chunkLength] for the portion of the file of x bytes corresponding to [_chunkByteSize]
-  _getChunk() {
+  void _getChunk() {
     final length = _totalChunks == 1 ? _fileSize : _chunkByteSize;
     final start = length * _chunkCount;
 
@@ -231,7 +230,7 @@ class UpChunk {
   }
 
   /// Called on net failure. If retry [_attemptCount] < [attempts], retry after [delayBeforeAttempt]
-  _manageRetries() {
+  void _manageRetries() {
     if (_attemptCount < attempts) {
       _attemptCount = _attemptCount + 1;
       Timer(Duration(seconds: delayBeforeAttempt), () => _sendChunks());
@@ -257,12 +256,12 @@ class UpChunk {
   }
 
   /// Manages the whole upload by calling [_getChunk] and [_sendChunk]
-  _sendChunks() {
-    if (_paused || _offline || _stopped)
-      return;
+  void _sendChunks() {
+    if (_paused || _offline || _stopped) return;
 
     _getChunk();
-    _sendChunk().then((res) {
+    _sendChunk().then(
+      (res) {
         if (successfulChunkUploadCodes.contains(res.statusCode)) {
           _chunkCount++;
           if (_chunkCount < _totalChunks) {
@@ -278,16 +277,14 @@ class UpChunk {
               final bytesSent = _chunkCount * _chunkByteSize;
               percentProgress = bytesSent * 100.0 / _fileSize;
             }
-            _onProgress!(percentProgress);
+            _onProgress!(percentProgress, _chunkCount);
           }
         } else if (temporaryErrorCodes.contains(res.statusCode)) {
-          if (_paused || _offline || _stopped)
-            return;
+          if (_paused || _offline || _stopped) return;
 
           _manageRetries();
         } else {
-          if (_paused || _offline || _stopped)
-            return;
+          if (_paused || _offline || _stopped) return;
 
           _uploadFailed = true;
 
@@ -300,21 +297,20 @@ class UpChunk {
         }
       },
       onError: (err) {
-        if (_paused || _offline || _stopped)
-          return;
+        if (_paused || _offline || _stopped) return;
 
         // this type of error can happen after network disconnection on CORS setup
         _manageRetries();
-      }
+      },
     );
   }
 
   /// Restarts the upload after if the upload failed and came to a complete stop
-  restart() {
+  void restart() {
     if (!_uploadFailed)
       throw Exception('Upload hasn\'t yet failed, please use restart only after all retries have failed.');
 
-    _chunkCount = 0;
+    _chunkCount = startChunk;
     _chunkByteSize = chunkSize * 1024;
     _attemptCount = 0;
     _currentCancelToken = null;

@@ -19,10 +19,15 @@ class UpChunkOptions {
   /// This parameter should be in multiples of 64
   int chunkSize = 5120;
 
+  /// The size in kb of the chunks to split the file into,
+  /// with the exception of the final chunk which may be smaller.
+  /// This parameter should be in multiples of 64
+  int? startChunk = 0;
+
   /// The number of times to retry any given chunk.
   int attempts = 5;
 
-  /// Number of seconds to wait before a retry is fired
+  /// Sets the start chunk of the uploader
   int delayBeforeAttempt = 1;
 
   /// Fired when the client has gone online.
@@ -53,5 +58,5 @@ class UpChunkOptions {
   /// Fired continuously with incremental upload progress. This returns the current percentage of the file that's been uploaded.
   ///
   /// [progress] a number from 0 to 100 representing the percentage of the file uploaded
-  void Function(double progress)? onProgress;
+  void Function(double progress, int chunk)? onProgress;
 }
