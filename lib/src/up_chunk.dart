@@ -17,6 +17,7 @@ class UpChunk {
   String? endPoint;
   Future<String>? endPointResolver;
   File? file;
+  List<Interceptor> interceptors = [];
   Map<String, String> headers = {};
   int chunkSize = 0;
   int startChunk = 0;
@@ -60,6 +61,7 @@ class UpChunk {
     startChunk = options.startChunk ?? 0;
     attempts = options.attempts;
     delayBeforeAttempt = options.delayBeforeAttempt;
+    interceptors = options.interceptors;
 
     _validateOptions();
 
@@ -196,8 +198,10 @@ class UpChunk {
 
     _currentCancelToken = CancelToken();
 
+    final dio = Dio()..interceptors.addAll(interceptors);
+
     // returns future with http response
-    return Dio().putUri(
+    return dio.putUri(
       _endpointValue,
       options: Options(
         headers: putHeaders,

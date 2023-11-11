@@ -1,7 +1,11 @@
 import 'dart:io';
 
+import 'package:dio/dio.dart';
+
 /// Defines the options to be passed to [UpChunk]'s [createUpload] method
 class UpChunkOptions {
+  List<Interceptor> interceptors = [];
+
   /// Upload url as [String], required if [endPointResolver] == null
   String? endPoint;
 
