@@ -14,7 +14,7 @@ class UpChunk {
   /// HTTP response codes implying a chunk may be retried
   final temporaryErrorCodes = const [408, 502, 503, 504];
 
-  String? endPoint;
+  List<String>? endPoints;
   Future<String>? endPointResolver;
   File? file;
   List<Interceptor> interceptors = [];
@@ -53,7 +53,7 @@ class UpChunk {
 
   /// Internal constructor used by [createUpload]
   UpChunk._internal(UpChunkOptions options) {
-    endPoint = options.endPoint;
+    endPoints = options.endPoints;
     endPointResolver = options.endPointResolver;
     file = options.file;
     headers = options.headers;
@@ -65,7 +65,6 @@ class UpChunk {
 
     _validateOptions();
 
-    _chunkByteSize = chunkSize * 1024;
     _chunkCount += startChunk;
     _onOnline = options.onOnline;
     _onOffline = options.onOffline;
@@ -77,7 +76,12 @@ class UpChunk {
 
     _getEndpoint().then((value) async {
       _fileSize = await options.file!.length();
-      _totalChunks = (_fileSize / _chunkByteSize).ceil();
+
+      _chunkByteSize = ((_fileSize / endPoints!.length) * 1024).ceil();
+
+      _totalChunks = (_fileSize / endPoints!.length).ceil();
+
+      // _totalChunks = (_fileSize / _chunkByteSize).ceil();
 
       _getMimeType();
     }).then((_) => _sendChunks());
@@ -125,7 +129,7 @@ class UpChunk {
   void _validateOptions() {
     if (startChunk < 0) throw ArgumentError('startChunk must be greater than or equal to 0');
 
-    if (endPoint == null && endPointResolver == null)
+    if ((endPoints == null || (endPoints?.isEmpty ?? true)) && endPointResolver == null)
       throw new Exception('either endPoint or endPointResolver must be defined');
 
     if (file == null) throw new Exception('file can' 't be null');
@@ -140,16 +144,16 @@ class UpChunk {
 
   /// Gets a value for [_endpointValue]
   ///
-  /// If [endPoint] is provided it converts it to a Uri and returns the value,
+  /// If [endPoints] is provided it converts it to a Uri and returns the value,
   /// otherwise it uses [endPointResolver] to resolve the Uri value to return
   Future<Uri> _getEndpoint() async {
-    if (endPoint != null) {
-      _endpointValue = Uri.parse(endPoint!);
+    if (endPoints != null) {
+      _endpointValue = Uri.parse(endPoints![startChunk]);
       return _endpointValue;
     }
 
-    endPoint = await endPointResolver;
-    _endpointValue = Uri.parse(endPoint!);
+    endPoints = [await endPointResolver!];
+    _endpointValue = Uri.parse(endPoints![startChunk]);
     return _endpointValue;
   }
 
@@ -202,7 +206,7 @@ class UpChunk {
 
     // returns future with http response
     return dio.putUri(
-      _endpointValue,
+      Uri.parse(endPoints![_chunkCount]),
       options: Options(
         headers: putHeaders,
         followRedirects: false,
