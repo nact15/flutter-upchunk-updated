@@ -65,7 +65,6 @@ class UpChunk {
 
     _validateOptions();
 
-    _totalChunks = endPoints!.length;
     _chunkCount += startChunk;
     _onOnline = options.onOnline;
     _onOffline = options.onOffline;
@@ -79,6 +78,8 @@ class UpChunk {
       _fileSize = await options.file!.length();
 
       _chunkByteSize = ((_fileSize / endPoints!.length) * 1024).ceil();
+
+      _totalChunks = (_fileSize / endPoints!.length).ceil();
 
       // _totalChunks = (_fileSize / _chunkByteSize).ceil();
 
