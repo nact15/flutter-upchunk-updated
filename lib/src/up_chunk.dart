@@ -185,10 +185,7 @@ class UpChunk {
     var rangeStart = _chunkCount * _chunkByteSize;
     var rangeEnd = rangeStart + _chunkLength - 1;
 
-    var putHeaders = {
-      'content-range': 'bytes $rangeStart-$rangeEnd/$_fileSize',
-      Headers.contentLengthHeader: _chunkLength
-    };
+    Map<String, dynamic> putHeaders = {Headers.contentLengthHeader: _chunkLength};
     if (_fileMimeType != null) {
       putHeaders.putIfAbsent(Headers.contentTypeHeader, () => _fileMimeType!);
     }
@@ -212,7 +209,10 @@ class UpChunk {
         followRedirects: false,
         validateStatus: (status) => true,
       ),
-      data: _chunk,
+      data: MultipartFile.fromStream(
+        () => _chunk,
+        _chunkLength,
+      ),
       onSendProgress: (int sent, int total) {
         if (_onProgress != null) {
           final bytesSent = _chunkCount * _chunkByteSize;
