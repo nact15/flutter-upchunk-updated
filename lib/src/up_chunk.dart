@@ -87,7 +87,7 @@ class UpChunk {
     }).then((_) => _sendChunks());
 
     // restart sync when back online
-    // trigger events when offline/back online
+    // trigger events when offline / back online
     ConnectionStatusSingleton connectionStatus = ConnectionStatusSingleton.getInstance();
     connectionStatus.connectionChange.listen(_connectionChanged);
   }
@@ -185,7 +185,13 @@ class UpChunk {
     var rangeStart = _chunkCount * _chunkByteSize;
     var rangeEnd = rangeStart + _chunkLength - 1;
 
-    Map<String, dynamic> putHeaders = {Headers.contentLengthHeader: _chunkLength};
+    print(await _chunk.length);
+    print(_chunkLength);
+
+    Map<String, dynamic> putHeaders = {
+      'content-range': 'bytes $rangeStart-$rangeEnd/$_fileSize',
+      Headers.contentLengthHeader: _chunkLength
+    };
     if (_fileMimeType != null) {
       putHeaders.putIfAbsent(Headers.contentTypeHeader, () => _fileMimeType!);
     }
@@ -211,7 +217,7 @@ class UpChunk {
       ),
       data: MultipartFile.fromStream(
         () => _chunk,
-        _chunkLength,
+        chunkSize,
       ),
       onSendProgress: (int sent, int total) {
         if (_onProgress != null) {
@@ -231,6 +237,7 @@ class UpChunk {
     final start = length * _chunkCount;
 
     _chunk = file!.openRead(start, start + length);
+
     if (start + length <= _fileSize)
       _chunkLength = length;
     else
@@ -238,14 +245,14 @@ class UpChunk {
   }
 
   /// Called on net failure. If retry [_attemptCount] < [attempts], retry after [delayBeforeAttempt]
-  void _manageRetries() {
+  void _manageRetries({String? message}) {
     if (_attemptCount < attempts) {
       _attemptCount = _attemptCount + 1;
       Timer(Duration(seconds: delayBeforeAttempt), () => _sendChunks());
 
       if (_onAttemptFailure != null)
         _onAttemptFailure!(
-          'An error occurred uploading chunk $_chunkCount. ${attempts - _attemptCount} retries left.',
+          'An error occurred uploading chunk $_chunkCount. ${attempts - _attemptCount} retries left. $message',
           _chunkCount,
           attempts - _attemptCount,
         );
@@ -311,7 +318,7 @@ class UpChunk {
         if (_paused || _offline || _stopped) return;
 
         // this type of error can happen after network disconnection on CORS setup
-        _manageRetries();
+        _manageRetries(message: err.toString());
       },
     );
   }
