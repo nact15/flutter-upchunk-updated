@@ -185,8 +185,9 @@ class UpChunk {
     var rangeStart = _chunkCount * _chunkByteSize;
     var rangeEnd = rangeStart + _chunkLength - 1;
 
-    print(await _chunk.length);
     print(_chunkLength);
+
+    print( _fileSize);
 
     Map<String, dynamic> putHeaders = {
       'content-range': 'bytes $rangeStart-$rangeEnd/$_fileSize',
@@ -215,10 +216,7 @@ class UpChunk {
         followRedirects: false,
         validateStatus: (status) => true,
       ),
-      data: MultipartFile.fromStream(
-        () => _chunk,
-        chunkSize,
-      ),
+      data: _chunk,
       onSendProgress: (int sent, int total) {
         if (_onProgress != null) {
           final bytesSent = _chunkCount * _chunkByteSize;
