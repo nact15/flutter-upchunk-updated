@@ -43,6 +43,7 @@ class UpChunk {
 
   void Function()? _onOnline;
   void Function()? _onOffline;
+  void Function(Map<String, dynamic>)? _onChunkUploaded;
   void Function(int chunkNumber, int chunkSize)? _onAttempt;
   void Function(String message, int chunkNumber, int attemptsLeft)? _onAttemptFailure;
   void Function(String message, int chunk, int attempts)? _onError;
@@ -73,6 +74,7 @@ class UpChunk {
     _onError = options.onError;
     _onSuccess = options.onSuccess;
     _onProgress = options.onProgress;
+    _onChunkUploaded = options.onChunkUploaded;
 
     _getEndpoint().then((value) async {
       _fileSize = await options.file!.length();
@@ -270,6 +272,8 @@ class UpChunk {
     _sendChunk().then(
       (res) {
         if (successfulChunkUploadCodes.contains(res.statusCode)) {
+          _onChunkUploaded?.call(res.headers.map);
+
           _chunkCount++;
           if (_chunkCount < _totalChunks) {
             _attemptCount = 0;

@@ -59,6 +59,9 @@ class UpChunkOptions {
   /// Fired when the upload is finished successfully.
   void Function()? onSuccess;
 
+  // Fired when chunk is uploaded, returns chunk headers
+  void Function(Map<String, dynamic>)? onChunkUploaded;
+
   /// Fired continuously with incremental upload progress. This returns the current percentage of the file that's been uploaded.
   ///
   /// [progress] a number from 0 to 100 representing the percentage of the file uploaded
